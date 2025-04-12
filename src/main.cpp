@@ -20,7 +20,7 @@ Button button3(&pin25);
 Interrupt pin5(5, RISING);
 Interrupt pin19(19, RISING);
 Interrupt pin21(21, FALLING);
-`
+
 Encoder encoder(&pin5, &pin19, false, &pin21);
 
 Semaphore sema(1,1);
