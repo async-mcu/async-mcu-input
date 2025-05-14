@@ -5,6 +5,7 @@
 #include <async/Interrupt.h>
 
 namespace async {
+    typedef Function<void(uint64_t)> TimeCallback;
 
     class Button {
         private:
@@ -15,7 +16,7 @@ namespace async {
 
         }
 
-        Tick * onPress(voidCallback callback) {
+        Tick * onPress(VoidCallback callback) {
             Semaphore * waiter = new Semaphore(1,1);
 
             return chain()
@@ -33,7 +34,7 @@ namespace async {
                 ->loop();
         }
 
-        Tick * onLongPress(voidCallback callback) {
+        Tick * onLongPress(VoidCallback callback) {
             Semaphore * waiter = new Semaphore(1,1);
 
             return chain<uint32_t>(0)
@@ -52,6 +53,44 @@ namespace async {
                     if(millis() - ms > 900 && interrupt->getValue() == (interrupt->getMode() == FALLING ? LOW : HIGH)) {
                         callback();
                     }
+
+                    return ms;
+                })
+                ->loop();
+        }
+
+        Tick * onTimePress(TimeCallback callback) {
+            Semaphore * waiter = new Semaphore(1,1);
+
+            return chain(0)
+                ->interrupt(interrupt)
+                ->semaphoreSkip(waiter)
+                ->delay(10)
+                ->then([](uint64_t ms) {
+                    return millis();
+                })
+                ->again([this, waiter](uint64_t ms) {
+                    // double check
+                    bool result = interrupt->getValue() != (interrupt->getMode() == FALLING ? LOW : HIGH);
+                    
+                    if(result) {
+                        waiter->release();
+                    }
+                    
+                    return result;
+                })
+                ->cycle([this](uint64_t ms) {
+                    if(interrupt->getValue() != (interrupt->getMode() == FALLING ? LOW : HIGH)) {
+                        return (uint64_t) nullptr;
+                    }
+
+                    return ms;
+                })
+                ->then([this, waiter, callback](uint64_t ms) {
+                    waiter->release();
+
+                    // double check
+                    callback(millis() - ms);
 
                     return ms;
                 })

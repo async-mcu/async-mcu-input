@@ -4,7 +4,7 @@
 #include <async/Interrupt.h>
 
 namespace async {
-    typedef Function<void(int, bool)> encoderCallback;
+    typedef Function<void(int, bool)> EncoderCallback;
 
     class Encoder {
         private:
@@ -24,7 +24,7 @@ namespace async {
             }
         }
 
-        Tick * onRotate(encoderCallback callback) {
+        Tick * onRotate(EncoderCallback callback) {
             Semaphore * waiter = new Semaphore(1,1);
 
             return first->onInterrupt([this, callback]() {
@@ -61,11 +61,11 @@ namespace async {
             //     ->loop();
         }
 
-        Tick * onPress(voidCallback callback) {
+        Tick * onPress(VoidCallback callback) {
             return this->butt->onPress(callback);
         }
 
-        Tick * onLongPress(voidCallback callback) {
+        Tick * onLongPress(VoidCallback callback) {
             return this->butt->onLongPress(callback);
         }
     };

@@ -70,7 +70,12 @@ void setup() {
     }));
 
     executor.add(button3.onLongPress([]() {
-      Serial.println("button3.onPress");
+      Serial.println("button3.onLongPress");
+    }));
+
+    executor.add(button3.onTimePress([](uint64_t ms) {
+      Serial.print("encoder.onTimePress value: ");
+      Serial.println(ms);
     }));
 }
 

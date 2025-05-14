@@ -3,6 +3,9 @@
         "new": "cpp",
         "*.tcc": "cpp",
         "string": "cpp",
-        "memory": "cpp"
+        "memory": "cpp",
+        "functional": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp"
     }
 }
