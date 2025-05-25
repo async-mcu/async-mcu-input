@@ -2,76 +2,89 @@
 
 #include <async/Task.h>
 #include <async/Chain.h>
-#include <async/Interrupt.h>
+#include <async/Pin.h>
+#include <async/Log.h>
 
 namespace async {
     typedef Function<void(uint64_t)> TimeCallback;
 
-    class Button {
+    class Button: public Tick {
         private:
-        Interrupt * interrupt;
+        Pin * pin;
+        Task * task;
+        Executor executor;
         
         public:
-        Button(Interrupt * interrupt): interrupt(interrupt) {
+        Button(Pin * pin): pin(pin) {}
 
+        bool start() override {
+            return executor.start();
         }
 
-        Tick * onPress(VoidCallback callback) {
+        Pin * getPin() {
+            return pin;
+        }
+
+        void onPress(VoidCallback callback) {
             Semaphore * waiter = new Semaphore(1,1);
 
-            return chain()
-                ->interrupt(interrupt)
-                ->semaphoreSkip(waiter)
+            executor.add(chain()
+                ->interrupt(pin, pin->getMode() == INPUT_PULLUP ? FALLING : RISING)
+                ->semaphoreSkipToStartIfNotAcquired(waiter)
                 ->delay(5)
                 ->then([this, waiter, callback]() {
-                    waiter->release();
+                    auto read = pin->digitalRead();
 
                     // double check
-                    if(interrupt->getValue() == (interrupt->getMode() == FALLING ? LOW : HIGH)) {
+                    if(read == (pin->getMode() == INPUT_PULLUP ? LOW : HIGH)) {
                         callback();
                     }
                 })
-                ->loop();
+                ->then([this, waiter, callback]() {
+                    waiter->release();
+                })
+                ->loop());
         }
 
-        Tick * onLongPress(VoidCallback callback) {
+        void onLongPress(int time, VoidCallback callback) {
             Semaphore * waiter = new Semaphore(1,1);
 
-            return chain<uint32_t>(0)
-                ->interrupt(interrupt)
-                ->semaphoreSkip(waiter)
+            executor.add(chain<uint32_t>(0)
+                ->interrupt(pin, pin->getMode() == INPUT_PULLUP ? FALLING : RISING)
+                ->semaphoreSkipToStartIfNotAcquired(waiter)
                 ->then([](uint32_t ms) {
                     return millis();
                 })
                 ->delay(10)
-                ->interrupt(interrupt, 1000)
+                ->interrupt(pin, pin->getMode() == INPUT_PULLUP ? RISING : FALLING, time)
                 ->delay(10)
-                ->then([this, waiter, callback](uint32_t ms) {
-                    waiter->release();
+                ->then([this, time, waiter, callback](uint32_t ms) {
+                    //Serial.println("123");
                     
                     // check fast press and double check
-                    if(millis() - ms > 900 && interrupt->getValue() == (interrupt->getMode() == FALLING ? LOW : HIGH)) {
+                    if(millis() - ms >= time && pin->digitalRead() == (pin->getMode() == INPUT_PULLUP ? LOW : HIGH)) {
                         callback();
                     }
 
+                    waiter->release();
                     return ms;
                 })
-                ->loop();
+                ->loop());
         }
 
-        Tick * onTimePress(TimeCallback callback) {
+        void onTimePress(TimeCallback callback) {
             Semaphore * waiter = new Semaphore(1,1);
 
-            return chain(0)
-                ->interrupt(interrupt)
-                ->semaphoreSkip(waiter)
+             executor.add(chain(0)
+                ->interrupt(pin, pin->getMode() == INPUT_PULLUP ? RISING : FALLING)
+                ->semaphoreSkipToStartIfNotAcquired(waiter)
                 ->delay(10)
                 ->then([](uint64_t ms) {
                     return millis();
                 })
                 ->again([this, waiter](uint64_t ms) {
                     // double check
-                    bool result = interrupt->getValue() != (interrupt->getMode() == FALLING ? LOW : HIGH);
+                    bool result = pin->digitalRead() != (pin->getMode() == INPUT_PULLUP ? LOW : HIGH);
                     
                     if(result) {
                         waiter->release();
@@ -80,7 +93,7 @@ namespace async {
                     return result;
                 })
                 ->cycle([this](uint64_t ms) {
-                    if(interrupt->getValue() != (interrupt->getMode() == FALLING ? LOW : HIGH)) {
+                    if(pin->digitalRead() != (pin->getMode() == INPUT_PULLUP ? LOW : HIGH)) {
                         return (uint64_t) nullptr;
                     }
 
@@ -94,7 +107,11 @@ namespace async {
 
                     return ms;
                 })
-                ->loop();
+                ->loop());
+        }
+
+        bool tick() override {
+            return executor.tick();
         }
     };
 }

@@ -1,22 +1,22 @@
 #include <async/Task.h>
 #include <async/Chain.h>
 #include <async/Button.h>
-#include <async/Interrupt.h>
+#include <async/Pin.h>
 
 namespace async {
     typedef Function<void(int, bool)> EncoderCallback;
 
     class Encoder {
         private:
-        Interrupt * first;
-        Interrupt * second;
-        Interrupt * button;
+        Pin * first;
+        Pin * second;
+        Pin * button;
         Button * butt;
         volatile int count;
         bool reverse;
         
         public:
-        Encoder(Interrupt * first, Interrupt * second, bool reverse = false, Interrupt * button = nullptr): 
+        Encoder(Pin * first, Pin * second, bool reverse = false, Pin * button = nullptr): 
             first(first), second(second), reverse(reverse), button(button), count(0) {
             
             if(button != nullptr) {
@@ -24,12 +24,12 @@ namespace async {
             }
         }
 
-        Tick * onRotate(EncoderCallback callback) {
+        void onRotate(EncoderCallback callback) {
             Semaphore * waiter = new Semaphore(1,1);
 
-            return first->onInterrupt([this, callback]() {
-                int firstVal = first->getValue();
-                int secondVal = second->getValue();
+            first->onInterrupt(first->getMode() == INPUT_PULLUP ? FALLING : RISING, [this, callback]() {
+                int firstVal = first->digitalRead();
+                int secondVal = second->digitalRead();
 
                 if(firstVal = HIGH && secondVal == HIGH && !reverse) {
                     callback(++count, true);
@@ -61,12 +61,12 @@ namespace async {
             //     ->loop();
         }
 
-        Tick * onPress(VoidCallback callback) {
-            return this->butt->onPress(callback);
+        void onPress(VoidCallback callback) {
+            this->butt->onPress(callback);
         }
 
-        Tick * onLongPress(VoidCallback callback) {
-            return this->butt->onLongPress(callback);
+        void onLongPress(int time, VoidCallback callback) {
+            this->butt->onLongPress(time, callback);
         }
     };
 }
